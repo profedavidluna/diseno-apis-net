@@ -1,6 +1,7 @@
+using LibreriaAPI.CQRS.Dispatcher;
+using LibreriaAPI.CQRS.Libros.Commands;
+using LibreriaAPI.CQRS.Libros.Queries;
 using LibreriaAPI.DTOs;
-using LibreriaAPI.Models;
-using LibreriaAPI.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibreriaAPI.Controllers;
@@ -10,19 +11,19 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class LibrosController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
+    private readonly ICqrsDispatcher _dispatcher;
 
-    public LibrosController(IUnitOfWork uow)
+    public LibrosController(ICqrsDispatcher dispatcher)
     {
-        _uow = uow;
+        _dispatcher = dispatcher;
     }
 
     /// <summary>Obtiene todos los libros con su categoría y autores</summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibros()
+    public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibros(CancellationToken ct)
     {
-        var libros = await _uow.Libros.GetAllAsync();
+        var libros = await _dispatcher.QueryAsync(new GetLibrosQuery(), ct);
         return Ok(libros);
     }
 
@@ -30,9 +31,9 @@ public class LibrosController : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(LibroDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<LibroDto>> GetLibro(int id)
+    public async Task<ActionResult<LibroDto>> GetLibro(int id, CancellationToken ct)
     {
-        var libro = await _uow.Libros.GetByIdAsync(id);
+        var libro = await _dispatcher.QueryAsync(new GetLibroByIdQuery(id), ct);
 
         if (libro is null)
             return NotFound();
@@ -43,9 +44,9 @@ public class LibrosController : ControllerBase
     /// <summary>Obtiene los libros de una categoría específica</summary>
     [HttpGet("categoria/{categoriaId:int}")]
     [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibrosPorCategoria(int categoriaId)
+    public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibrosPorCategoria(int categoriaId, CancellationToken ct)
     {
-        var libros = await _uow.Libros.GetByCategoriaAsync(categoriaId);
+        var libros = await _dispatcher.QueryAsync(new GetLibrosByCategoriaQuery(categoriaId), ct);
         return Ok(libros);
     }
 
@@ -54,36 +55,18 @@ public class LibrosController : ControllerBase
     [ProducesResponseType(typeof(LibroDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<LibroDto>> PostLibro(CrearLibroDto dto)
+    public async Task<ActionResult<LibroDto>> PostLibro(CrearLibroDto dto, CancellationToken ct)
     {
-        var categoria = await _uow.Libros.GetCategoriaAsync(dto.CategoriaId);
-        if (categoria is null)
+        var result = await _dispatcher.CommandAsync(
+            new CreateLibroCommand(dto.Titulo, dto.Descripcion, dto.ISBN, dto.AnioPublicacion, dto.CategoriaId, dto.AutoresIds), ct);
+
+        if (result.CategoriaNoEncontrada)
             return NotFound($"Categoría con Id {dto.CategoriaId} no encontrada.");
 
-        var autores = await _uow.Libros.GetAutoresByIdsAsync(dto.AutoresIds);
-
-        if (autores.Count != dto.AutoresIds.Count())
+        if (result.AutoresInvalidos)
             return BadRequest("Uno o más autores no fueron encontrados.");
 
-        var libro = new Libro
-        {
-            Titulo = dto.Titulo,
-            Descripcion = dto.Descripcion,
-            ISBN = dto.ISBN,
-            AnioPublicacion = dto.AnioPublicacion,
-            CategoriaId = dto.CategoriaId
-        };
-
-        await _uow.Libros.AddAsync(libro);
-        await _uow.SaveChangesAsync();
-
-        foreach (var autor in autores)
-        {
-            await _uow.Libros.AddLibroAutorAsync(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id });
-        }
-        await _uow.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetLibro), new { id = libro.Id }, await _uow.Libros.GetByIdAsync(libro.Id));
+        return CreatedAtAction(nameof(GetLibro), new { id = result.Libro!.Id }, result.Libro);
     }
 
     /// <summary>Actualiza un libro existente</summary>
@@ -91,35 +74,20 @@ public class LibrosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> PutLibro(int id, ActualizarLibroDto dto)
+    public async Task<IActionResult> PutLibro(int id, ActualizarLibroDto dto, CancellationToken ct)
     {
-        var libro = await _uow.Libros.GetWithAutoresAsync(id);
+        var result = await _dispatcher.CommandAsync(
+            new UpdateLibroCommand(id, dto.Titulo, dto.Descripcion, dto.ISBN, dto.AnioPublicacion, dto.CategoriaId, dto.AutoresIds), ct);
 
-        if (libro is null)
+        if (result.LibroNoEncontrado)
             return NotFound();
 
-        var categoria = await _uow.Libros.GetCategoriaAsync(dto.CategoriaId);
-        if (categoria is null)
+        if (result.CategoriaNoEncontrada)
             return NotFound($"Categoría con Id {dto.CategoriaId} no encontrada.");
 
-        var autores = await _uow.Libros.GetAutoresByIdsAsync(dto.AutoresIds);
-
-        if (autores.Count != dto.AutoresIds.Count())
+        if (result.AutoresInvalidos)
             return BadRequest("Uno o más autores no fueron encontrados.");
 
-        libro.Titulo = dto.Titulo;
-        libro.Descripcion = dto.Descripcion;
-        libro.ISBN = dto.ISBN;
-        libro.AnioPublicacion = dto.AnioPublicacion;
-        libro.CategoriaId = dto.CategoriaId;
-
-        _uow.Libros.RemoveLibroAutores(libro.LibroAutores);
-        foreach (var autor in autores)
-        {
-            await _uow.Libros.AddLibroAutorAsync(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id });
-        }
-
-        await _uow.SaveChangesAsync();
         return NoContent();
     }
 
@@ -127,16 +95,13 @@ public class LibrosController : ControllerBase
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteLibro(int id)
+    public async Task<IActionResult> DeleteLibro(int id, CancellationToken ct)
     {
-        var libro = await _uow.Libros.GetWithAutoresAsync(id);
+        var found = await _dispatcher.CommandAsync(new DeleteLibroCommand(id), ct);
 
-        if (libro is null)
+        if (!found)
             return NotFound();
 
-        _uow.Libros.RemoveLibroAutores(libro.LibroAutores);
-        _uow.Libros.Remove(libro);
-        await _uow.SaveChangesAsync();
         return NoContent();
     }
 }
