@@ -1,5 +1,6 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
+using LibreriaAPI.Hateoas;
 using LibreriaAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,16 +13,18 @@ namespace LibreriaAPI.Controllers;
 public class LibrosController : ControllerBase
 {
     private readonly LibreriaContext _context;
+    private readonly IHateoasService<LibroDto> _hateoasService;
 
-    public LibrosController(LibreriaContext context)
+    public LibrosController(LibreriaContext context, IHateoasService<LibroDto> hateoasService)
     {
         _context = context;
+        _hateoasService = hateoasService;
     }
 
     /// <summary>Obtiene todos los libros con su categoría y autores</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibros()
+    [ProducesResponseType(typeof(HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>>> GetLibros()
     {
         var libros = await _context.Libros
             .Include(l => l.Categoria)
@@ -44,14 +47,21 @@ public class LibrosController : ControllerBase
             ))
             .ToListAsync();
 
-        return Ok(libros);
+        var items = libros.Select(l =>
+            new HateoasResponse<LibroDto>(l, _hateoasService.GenerateLinks(l, HttpContext)));
+
+        var response = new HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>(
+            items,
+            _hateoasService.GenerateCollectionLinks(HttpContext));
+
+        return Ok(response);
     }
 
     /// <summary>Obtiene un libro por su ID</summary>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(LibroDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(HateoasResponse<LibroDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<LibroDto>> GetLibro(int id)
+    public async Task<ActionResult<HateoasResponse<LibroDto>>> GetLibro(int id)
     {
         var libro = await _context.Libros
             .Include(l => l.Categoria)
@@ -62,7 +72,7 @@ public class LibrosController : ControllerBase
         if (libro is null)
             return NotFound();
 
-        var result = new LibroDto(
+        var dto = new LibroDto(
             libro.Id,
             libro.Titulo,
             libro.Descripcion,
@@ -78,13 +88,14 @@ public class LibrosController : ControllerBase
             ))
         );
 
-        return Ok(result);
+        var response = new HateoasResponse<LibroDto>(dto, _hateoasService.GenerateLinks(dto, HttpContext));
+        return Ok(response);
     }
 
     /// <summary>Obtiene los libros de una categoría específica</summary>
     [HttpGet("categoria/{categoriaId:int}")]
-    [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibrosPorCategoria(int categoriaId)
+    [ProducesResponseType(typeof(HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>>> GetLibrosPorCategoria(int categoriaId)
     {
         var libros = await _context.Libros
             .Where(l => l.CategoriaId == categoriaId)
@@ -108,15 +119,22 @@ public class LibrosController : ControllerBase
             ))
             .ToListAsync();
 
-        return Ok(libros);
+        var items = libros.Select(l =>
+            new HateoasResponse<LibroDto>(l, _hateoasService.GenerateLinks(l, HttpContext)));
+
+        var response = new HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>(
+            items,
+            _hateoasService.GenerateCollectionLinks(HttpContext));
+
+        return Ok(response);
     }
 
     /// <summary>Crea un nuevo libro</summary>
     [HttpPost]
-    [ProducesResponseType(typeof(LibroDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(HateoasResponse<LibroDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<LibroDto>> PostLibro(CrearLibroDto dto)
+    public async Task<ActionResult<HateoasResponse<LibroDto>>> PostLibro(CrearLibroDto dto)
     {
         var categoria = await _context.Categorias.FindAsync(dto.CategoriaId);
         if (categoria is null)
@@ -147,7 +165,13 @@ public class LibrosController : ControllerBase
         }
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetLibro), new { id = libro.Id }, await BuildLibroDto(libro.Id));
+        var libroDto = await BuildLibroDto(libro.Id);
+        if (libroDto is null)
+            return StatusCode(StatusCodes.Status500InternalServerError, "Error al recuperar el libro creado.");
+
+        var response = new HateoasResponse<LibroDto>(libroDto, _hateoasService.GenerateLinks(libroDto, HttpContext));
+
+        return CreatedAtAction(nameof(GetLibro), new { id = libro.Id }, response);
     }
 
     /// <summary>Actualiza un libro existente</summary>
