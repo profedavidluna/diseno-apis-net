@@ -1,4 +1,6 @@
 using LibreriaAPI.Data;
+using LibreriaAPI.DTOs;
+using LibreriaAPI.Hateoas;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -7,6 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Controllers
 builder.Services.AddControllers();
+
+// HATEOAS – servicios que generan los links por tipo de recurso
+builder.Services.AddScoped<IHateoasService<AutorDto>, AutorHateoasService>();
+builder.Services.AddScoped<IHateoasService<CategoriaDto>, CategoriaHateoasService>();
+builder.Services.AddScoped<IHateoasService<LibroDto>, LibroHateoasService>();
 
 // EF Core - Base de datos en memoria
 builder.Services.AddDbContext<LibreriaContext>(options =>
@@ -20,7 +27,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Librería API",
         Version = "v1",
-        Description = "API REST para gestionar libros, categorías y autores de una librería.",
+        Description = "API REST para gestionar libros, categorías y autores de una librería. Implementa HATEOAS: cada respuesta incluye una lista de links que describen las acciones disponibles sobre el recurso.",
         Contact = new OpenApiContact
         {
             Name = "Librería",
