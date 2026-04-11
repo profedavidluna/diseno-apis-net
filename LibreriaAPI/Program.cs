@@ -1,6 +1,7 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Hateoas;
+using LibreriaAPI.Idempotency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -10,10 +11,17 @@ var builder = WebApplication.CreateBuilder(args);
 // Controllers
 builder.Services.AddControllers();
 
+// IMemoryCache – requerido por IdempotencyService
+builder.Services.AddMemoryCache();
+
 // HATEOAS – servicios que generan los links por tipo de recurso
 builder.Services.AddScoped<IHateoasService<AutorDto>, AutorHateoasService>();
 builder.Services.AddScoped<IHateoasService<CategoriaDto>, CategoriaHateoasService>();
 builder.Services.AddScoped<IHateoasService<LibroDto>, LibroHateoasService>();
+
+// Idempotencia – servicio singleton para cachear respuestas por clave
+builder.Services.AddSingleton<IIdempotencyService, IdempotencyService>();
+builder.Services.AddScoped<IdempotencyFilter>();
 
 // EF Core - Base de datos en memoria
 builder.Services.AddDbContext<LibreriaContext>(options =>
@@ -40,6 +48,9 @@ builder.Services.AddSwaggerGen(c =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
         c.IncludeXmlComments(xmlPath);
+
+    // Documenta el encabezado Idempotency-Key en todos los endpoints POST
+    c.OperationFilter<IdempotencyOperationFilter>();
 });
 
 var app = builder.Build();
