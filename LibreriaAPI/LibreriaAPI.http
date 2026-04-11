@@ -1,0 +1,16 @@
+@LibreriaAPI_HostAddress = http://localhost:5091
+
+GET {{LibreriaAPI_HostAddress}}/api/libros
+Accept: application/json
+
+###
+
+GET {{LibreriaAPI_HostAddress}}/api/categorias
+Accept: application/json
+
+###
+
+GET {{LibreriaAPI_HostAddress}}/api/autores
+Accept: application/json
+
+###

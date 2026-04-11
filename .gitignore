@@ -1,0 +1,20 @@
+## .NET / ASP.NET Core
+**/bin/
+**/obj/
+*.user
+*.suo
+*.swp
+*.DS_Store
+.vs/
+.vscode/
+*.nupkg
+*.snupkg
+*.log
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+## Build artifacts
+artifacts/
+publish/
+out/
