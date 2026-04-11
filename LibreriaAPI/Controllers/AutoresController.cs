@@ -1,8 +1,7 @@
-using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models;
+using LibreriaAPI.Repositories;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LibreriaAPI.Controllers;
 
@@ -11,11 +10,11 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class AutoresController : ControllerBase
 {
-    private readonly LibreriaContext _context;
+    private readonly IAutoresRepository _repository;
 
-    public AutoresController(LibreriaContext context)
+    public AutoresController(IAutoresRepository repository)
     {
-        _context = context;
+        _repository = repository;
     }
 
     /// <summary>Obtiene todos los autores</summary>
@@ -23,10 +22,7 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<AutorDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<AutorDto>>> GetAutores()
     {
-        var autores = await _context.Autores
-            .Select(a => new AutorDto(a.Id, a.Nombre, a.Apellido, a.Biografia))
-            .ToListAsync();
-
+        var autores = await _repository.GetAllAsync();
         return Ok(autores);
     }
 
@@ -36,7 +32,7 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AutorDto>> GetAutor(int id)
     {
-        var autor = await _context.Autores.FindAsync(id);
+        var autor = await _repository.GetByIdAsync(id);
 
         if (autor is null)
             return NotFound();
@@ -57,8 +53,8 @@ public class AutoresController : ControllerBase
             Biografia = dto.Biografia
         };
 
-        _context.Autores.Add(autor);
-        await _context.SaveChangesAsync();
+        await _repository.AddAsync(autor);
+        await _repository.SaveChangesAsync();
 
         var result = new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia);
         return CreatedAtAction(nameof(GetAutor), new { id = autor.Id }, result);
@@ -70,7 +66,7 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutAutor(int id, ActualizarAutorDto dto)
     {
-        var autor = await _context.Autores.FindAsync(id);
+        var autor = await _repository.GetByIdAsync(id);
 
         if (autor is null)
             return NotFound();
@@ -79,7 +75,7 @@ public class AutoresController : ControllerBase
         autor.Apellido = dto.Apellido;
         autor.Biografia = dto.Biografia;
 
-        await _context.SaveChangesAsync();
+        await _repository.SaveChangesAsync();
         return NoContent();
     }
 
@@ -89,13 +85,13 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteAutor(int id)
     {
-        var autor = await _context.Autores.FindAsync(id);
+        var autor = await _repository.GetByIdAsync(id);
 
         if (autor is null)
             return NotFound();
 
-        _context.Autores.Remove(autor);
-        await _context.SaveChangesAsync();
+        _repository.Remove(autor);
+        await _repository.SaveChangesAsync();
         return NoContent();
     }
 }
