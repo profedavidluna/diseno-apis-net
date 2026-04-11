@@ -1,5 +1,5 @@
 using LibreriaAPI.Data;
-using LibreriaAPI.Repositories;
+using LibreriaAPI.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -13,10 +13,8 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<LibreriaContext>(options =>
     options.UseInMemoryDatabase("LibreriaDB"));
 
-// Repositories
-builder.Services.AddScoped<IAutoresRepository, AutoresRepository>();
-builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
-builder.Services.AddScoped<ILibrosRepository, LibrosRepository>();
+// Unit of Work (repositories are created internally by UnitOfWork using the shared context)
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();

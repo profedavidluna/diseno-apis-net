@@ -111,7 +111,4 @@ public class LibrosRepository : ILibrosRepository
 
     public void Remove(Libro libro)
         => _context.Libros.Remove(libro);
-
-    public async Task SaveChangesAsync()
-        => await _context.SaveChangesAsync();
 }

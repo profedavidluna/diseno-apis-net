@@ -27,7 +27,4 @@ public class AutoresRepository : IAutoresRepository
 
     public void Remove(Autor autor)
         => _context.Autores.Remove(autor);
-
-    public async Task SaveChangesAsync()
-        => await _context.SaveChangesAsync();
 }

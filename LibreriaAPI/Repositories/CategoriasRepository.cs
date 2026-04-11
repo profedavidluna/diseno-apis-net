@@ -27,7 +27,4 @@ public class CategoriasRepository : ICategoriasRepository
 
     public void Remove(Categoria categoria)
         => _context.Categorias.Remove(categoria);
-
-    public async Task SaveChangesAsync()
-        => await _context.SaveChangesAsync();
 }
