@@ -15,5 +15,4 @@ public interface ILibrosRepository
     Task AddLibroAutorAsync(LibroAutor libroAutor);
     void RemoveLibroAutores(IEnumerable<LibroAutor> libroAutores);
     void Remove(Libro libro);
-    Task SaveChangesAsync();
 }
