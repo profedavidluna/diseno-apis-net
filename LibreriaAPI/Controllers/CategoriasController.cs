@@ -1,8 +1,7 @@
-using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models;
+using LibreriaAPI.Repositories;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LibreriaAPI.Controllers;
 
@@ -11,11 +10,11 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class CategoriasController : ControllerBase
 {
-    private readonly LibreriaContext _context;
+    private readonly ICategoriasRepository _repository;
 
-    public CategoriasController(LibreriaContext context)
+    public CategoriasController(ICategoriasRepository repository)
     {
-        _context = context;
+        _repository = repository;
     }
 
     /// <summary>Obtiene todas las categorías</summary>
@@ -23,10 +22,7 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<CategoriaDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias()
     {
-        var categorias = await _context.Categorias
-            .Select(c => new CategoriaDto(c.Id, c.Nombre, c.Descripcion))
-            .ToListAsync();
-
+        var categorias = await _repository.GetAllAsync();
         return Ok(categorias);
     }
 
@@ -36,7 +32,7 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CategoriaDto>> GetCategoria(int id)
     {
-        var categoria = await _context.Categorias.FindAsync(id);
+        var categoria = await _repository.GetByIdAsync(id);
 
         if (categoria is null)
             return NotFound();
@@ -56,8 +52,8 @@ public class CategoriasController : ControllerBase
             Descripcion = dto.Descripcion
         };
 
-        _context.Categorias.Add(categoria);
-        await _context.SaveChangesAsync();
+        await _repository.AddAsync(categoria);
+        await _repository.SaveChangesAsync();
 
         var result = new CategoriaDto(categoria.Id, categoria.Nombre, categoria.Descripcion);
         return CreatedAtAction(nameof(GetCategoria), new { id = categoria.Id }, result);
@@ -69,7 +65,7 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutCategoria(int id, ActualizarCategoriaDto dto)
     {
-        var categoria = await _context.Categorias.FindAsync(id);
+        var categoria = await _repository.GetByIdAsync(id);
 
         if (categoria is null)
             return NotFound();
@@ -77,7 +73,7 @@ public class CategoriasController : ControllerBase
         categoria.Nombre = dto.Nombre;
         categoria.Descripcion = dto.Descripcion;
 
-        await _context.SaveChangesAsync();
+        await _repository.SaveChangesAsync();
         return NoContent();
     }
 
@@ -87,13 +83,13 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteCategoria(int id)
     {
-        var categoria = await _context.Categorias.FindAsync(id);
+        var categoria = await _repository.GetByIdAsync(id);
 
         if (categoria is null)
             return NotFound();
 
-        _context.Categorias.Remove(categoria);
-        await _context.SaveChangesAsync();
+        _repository.Remove(categoria);
+        await _repository.SaveChangesAsync();
         return NoContent();
     }
 }

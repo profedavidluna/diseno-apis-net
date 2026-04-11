@@ -1,4 +1,5 @@
 using LibreriaAPI.Data;
+using LibreriaAPI.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -11,6 +12,11 @@ builder.Services.AddControllers();
 // EF Core - Base de datos en memoria
 builder.Services.AddDbContext<LibreriaContext>(options =>
     options.UseInMemoryDatabase("LibreriaDB"));
+
+// Repositories
+builder.Services.AddScoped<IAutoresRepository, AutoresRepository>();
+builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
+builder.Services.AddScoped<ILibrosRepository, LibrosRepository>();
 
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
