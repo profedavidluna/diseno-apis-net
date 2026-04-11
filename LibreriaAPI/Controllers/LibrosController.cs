@@ -1,6 +1,7 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Hateoas;
+using LibreriaAPI.Idempotency;
 using LibreriaAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -130,7 +131,9 @@ public class LibrosController : ControllerBase
     }
 
     /// <summary>Crea un nuevo libro</summary>
+    /// <remarks>Requiere el encabezado 'Idempotency-Key' (UUID). Si se repite la clave, se devuelve la respuesta original.</remarks>
     [HttpPost]
+    [ServiceFilter(typeof(IdempotencyFilter))]
     [ProducesResponseType(typeof(HateoasResponse<LibroDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
