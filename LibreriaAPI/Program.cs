@@ -5,8 +5,12 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Controllers
-builder.Services.AddControllers();
+// Controllers with Newtonsoft JSON (required for JSON Patch support)
+builder.Services.AddControllers()
+    .AddNewtonsoftJson();
+
+// Response Caching
+builder.Services.AddResponseCaching();
 
 // EF Core - Base de datos en memoria
 builder.Services.AddDbContext<LibreriaContext>(options =>
@@ -56,5 +60,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseResponseCaching();
 app.MapControllers();
 app.Run();

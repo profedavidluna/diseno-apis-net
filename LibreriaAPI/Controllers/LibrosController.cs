@@ -1,6 +1,7 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +21,7 @@ public class LibrosController : ControllerBase
 
     /// <summary>Obtiene todos los libros con su categoría y autores</summary>
     [HttpGet]
+    [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibros()
     {
@@ -49,6 +51,7 @@ public class LibrosController : ControllerBase
 
     /// <summary>Obtiene un libro por su ID</summary>
     [HttpGet("{id:int}")]
+    [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(LibroDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LibroDto>> GetLibro(int id)
@@ -83,6 +86,7 @@ public class LibrosController : ControllerBase
 
     /// <summary>Obtiene los libros de una categoría específica</summary>
     [HttpGet("categoria/{categoriaId:int}")]
+    [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibrosPorCategoria(int categoriaId)
     {
@@ -185,6 +189,79 @@ public class LibrosController : ControllerBase
         foreach (var autor in autores)
         {
             _context.LibroAutores.Add(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id });
+        }
+
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>Actualiza parcialmente un libro usando JSON Patch (RFC 6902)</summary>
+    /// <remarks>
+    /// Ejemplo de body (application/json-patch+json):
+    ///
+    ///     [
+    ///       { "op": "replace", "path": "/titulo", "value": "Nuevo Título" },
+    ///       { "op": "replace", "path": "/anioPublicacion", "value": 2024 }
+    ///     ]
+    /// </remarks>
+    [HttpPatch("{id:int}")]
+    [Consumes("application/json-patch+json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PatchLibro(int id, JsonPatchDocument<PatchLibroDto> patchDoc)
+    {
+        if (patchDoc is null)
+            return BadRequest();
+
+        var libro = await _context.Libros
+            .Include(l => l.LibroAutores)
+            .FirstOrDefaultAsync(l => l.Id == id);
+
+        if (libro is null)
+            return NotFound();
+
+        var dto = new PatchLibroDto
+        {
+            Titulo = libro.Titulo,
+            Descripcion = libro.Descripcion,
+            ISBN = libro.ISBN,
+            AnioPublicacion = libro.AnioPublicacion,
+            CategoriaId = libro.CategoriaId,
+            AutoresIds = libro.LibroAutores.Select(la => la.AutorId)
+        };
+
+        patchDoc.ApplyTo(dto, ModelState);
+
+        if (!TryValidateModel(dto))
+            return ValidationProblem(ModelState);
+
+        // Validate category if changed
+        var categoria = await _context.Categorias.FindAsync(dto.CategoriaId);
+        if (categoria is null)
+            return NotFound($"Categoría con Id {dto.CategoriaId} no encontrada.");
+
+        libro.Titulo = dto.Titulo;
+        libro.Descripcion = dto.Descripcion;
+        libro.ISBN = dto.ISBN;
+        libro.AnioPublicacion = dto.AnioPublicacion;
+        libro.CategoriaId = dto.CategoriaId;
+
+        // Update authors only if provided in the patch
+        if (dto.AutoresIds is not null)
+        {
+            var autores = await _context.Autores
+                .Where(a => dto.AutoresIds.Contains(a.Id))
+                .ToListAsync();
+
+            if (autores.Count != dto.AutoresIds.Count())
+                return BadRequest("Uno o más autores no fueron encontrados.");
+
+            _context.LibroAutores.RemoveRange(libro.LibroAutores);
+            foreach (var autor in autores)
+            {
+                _context.LibroAutores.Add(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id });
+            }
         }
 
         await _context.SaveChangesAsync();
