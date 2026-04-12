@@ -1,6 +1,7 @@
+using LibreriaAPI.CQRS.Categorias.Commands;
+using LibreriaAPI.CQRS.Categorias.Queries;
+using LibreriaAPI.CQRS.Dispatcher;
 using LibreriaAPI.DTOs;
-using LibreriaAPI.Models;
-using LibreriaAPI.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibreriaAPI.Controllers;
@@ -10,19 +11,19 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class CategoriasController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
+    private readonly ICqrsDispatcher _dispatcher;
 
-    public CategoriasController(IUnitOfWork uow)
+    public CategoriasController(ICqrsDispatcher dispatcher)
     {
-        _uow = uow;
+        _dispatcher = dispatcher;
     }
 
     /// <summary>Obtiene todas las categorías</summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<CategoriaDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias()
+    public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias(CancellationToken ct)
     {
-        var categorias = await _uow.Categorias.GetAllAsync();
+        var categorias = await _dispatcher.QueryAsync(new GetCategoriasQuery(), ct);
         return Ok(categorias);
     }
 
@@ -30,50 +31,40 @@ public class CategoriasController : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(CategoriaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CategoriaDto>> GetCategoria(int id)
+    public async Task<ActionResult<CategoriaDto>> GetCategoria(int id, CancellationToken ct)
     {
-        var categoria = await _uow.Categorias.GetByIdAsync(id);
+        var categoria = await _dispatcher.QueryAsync(new GetCategoriaByIdQuery(id), ct);
 
         if (categoria is null)
             return NotFound();
 
-        return Ok(new CategoriaDto(categoria.Id, categoria.Nombre, categoria.Descripcion));
+        return Ok(categoria);
     }
 
     /// <summary>Crea una nueva categoría</summary>
     [HttpPost]
     [ProducesResponseType(typeof(CategoriaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<CategoriaDto>> PostCategoria(CrearCategoriaDto dto)
+    public async Task<ActionResult<CategoriaDto>> PostCategoria(CrearCategoriaDto dto, CancellationToken ct)
     {
-        var categoria = new Categoria
-        {
-            Nombre = dto.Nombre,
-            Descripcion = dto.Descripcion
-        };
+        var result = await _dispatcher.CommandAsync(
+            new CreateCategoriaCommand(dto.Nombre, dto.Descripcion), ct);
 
-        await _uow.Categorias.AddAsync(categoria);
-        await _uow.SaveChangesAsync();
-
-        var result = new CategoriaDto(categoria.Id, categoria.Nombre, categoria.Descripcion);
-        return CreatedAtAction(nameof(GetCategoria), new { id = categoria.Id }, result);
+        return CreatedAtAction(nameof(GetCategoria), new { id = result.Id }, result);
     }
 
     /// <summary>Actualiza una categoría existente</summary>
     [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> PutCategoria(int id, ActualizarCategoriaDto dto)
+    public async Task<IActionResult> PutCategoria(int id, ActualizarCategoriaDto dto, CancellationToken ct)
     {
-        var categoria = await _uow.Categorias.GetByIdAsync(id);
+        var result = await _dispatcher.CommandAsync(
+            new UpdateCategoriaCommand(id, dto.Nombre, dto.Descripcion), ct);
 
-        if (categoria is null)
+        if (result is null)
             return NotFound();
 
-        categoria.Nombre = dto.Nombre;
-        categoria.Descripcion = dto.Descripcion;
-
-        await _uow.SaveChangesAsync();
         return NoContent();
     }
 
@@ -81,15 +72,13 @@ public class CategoriasController : ControllerBase
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteCategoria(int id)
+    public async Task<IActionResult> DeleteCategoria(int id, CancellationToken ct)
     {
-        var categoria = await _uow.Categorias.GetByIdAsync(id);
+        var found = await _dispatcher.CommandAsync(new DeleteCategoriaCommand(id), ct);
 
-        if (categoria is null)
+        if (!found)
             return NotFound();
 
-        _uow.Categorias.Remove(categoria);
-        await _uow.SaveChangesAsync();
         return NoContent();
     }
 }

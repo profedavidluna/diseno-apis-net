@@ -1,6 +1,7 @@
+using LibreriaAPI.CQRS.Autores.Commands;
+using LibreriaAPI.CQRS.Autores.Queries;
+using LibreriaAPI.CQRS.Dispatcher;
 using LibreriaAPI.DTOs;
-using LibreriaAPI.Models;
-using LibreriaAPI.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibreriaAPI.Controllers;
@@ -10,19 +11,19 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class AutoresController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
+    private readonly ICqrsDispatcher _dispatcher;
 
-    public AutoresController(IUnitOfWork uow)
+    public AutoresController(ICqrsDispatcher dispatcher)
     {
-        _uow = uow;
+        _dispatcher = dispatcher;
     }
 
     /// <summary>Obtiene todos los autores</summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<AutorDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<AutorDto>>> GetAutores()
+    public async Task<ActionResult<IEnumerable<AutorDto>>> GetAutores(CancellationToken ct)
     {
-        var autores = await _uow.Autores.GetAllAsync();
+        var autores = await _dispatcher.QueryAsync(new GetAutoresQuery(), ct);
         return Ok(autores);
     }
 
@@ -30,52 +31,40 @@ public class AutoresController : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(AutorDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<AutorDto>> GetAutor(int id)
+    public async Task<ActionResult<AutorDto>> GetAutor(int id, CancellationToken ct)
     {
-        var autor = await _uow.Autores.GetByIdAsync(id);
+        var autor = await _dispatcher.QueryAsync(new GetAutorByIdQuery(id), ct);
 
         if (autor is null)
             return NotFound();
 
-        return Ok(new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia));
+        return Ok(autor);
     }
 
     /// <summary>Crea un nuevo autor</summary>
     [HttpPost]
     [ProducesResponseType(typeof(AutorDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<AutorDto>> PostAutor(CrearAutorDto dto)
+    public async Task<ActionResult<AutorDto>> PostAutor(CrearAutorDto dto, CancellationToken ct)
     {
-        var autor = new Autor
-        {
-            Nombre = dto.Nombre,
-            Apellido = dto.Apellido,
-            Biografia = dto.Biografia
-        };
+        var result = await _dispatcher.CommandAsync(
+            new CreateAutorCommand(dto.Nombre, dto.Apellido, dto.Biografia), ct);
 
-        await _uow.Autores.AddAsync(autor);
-        await _uow.SaveChangesAsync();
-
-        var result = new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia);
-        return CreatedAtAction(nameof(GetAutor), new { id = autor.Id }, result);
+        return CreatedAtAction(nameof(GetAutor), new { id = result.Id }, result);
     }
 
     /// <summary>Actualiza un autor existente</summary>
     [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> PutAutor(int id, ActualizarAutorDto dto)
+    public async Task<IActionResult> PutAutor(int id, ActualizarAutorDto dto, CancellationToken ct)
     {
-        var autor = await _uow.Autores.GetByIdAsync(id);
+        var result = await _dispatcher.CommandAsync(
+            new UpdateAutorCommand(id, dto.Nombre, dto.Apellido, dto.Biografia), ct);
 
-        if (autor is null)
+        if (result is null)
             return NotFound();
 
-        autor.Nombre = dto.Nombre;
-        autor.Apellido = dto.Apellido;
-        autor.Biografia = dto.Biografia;
-
-        await _uow.SaveChangesAsync();
         return NoContent();
     }
 
@@ -83,15 +72,13 @@ public class AutoresController : ControllerBase
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteAutor(int id)
+    public async Task<IActionResult> DeleteAutor(int id, CancellationToken ct)
     {
-        var autor = await _uow.Autores.GetByIdAsync(id);
+        var found = await _dispatcher.CommandAsync(new DeleteAutorCommand(id), ct);
 
-        if (autor is null)
+        if (!found)
             return NotFound();
 
-        _uow.Autores.Remove(autor);
-        await _uow.SaveChangesAsync();
         return NoContent();
     }
 }
