@@ -1,6 +1,8 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,8 +23,10 @@ public class LibrosController : ControllerBase
 
     /// <summary>Obtiene todos los libros con su categoría y autores</summary>
     [HttpGet]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibros()
     {
         var libros = await _context.Libros
@@ -51,8 +55,10 @@ public class LibrosController : ControllerBase
 
     /// <summary>Obtiene un libro por su ID</summary>
     [HttpGet("{id:int}")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(LibroDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LibroDto>> GetLibro(int id)
     {
@@ -86,8 +92,10 @@ public class LibrosController : ControllerBase
 
     /// <summary>Obtiene los libros de una categoría específica</summary>
     [HttpGet("categoria/{categoriaId:int}")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibrosPorCategoria(int categoriaId)
     {
         var libros = await _context.Libros
@@ -117,8 +125,10 @@ public class LibrosController : ControllerBase
 
     /// <summary>Crea un nuevo libro</summary>
     [HttpPost]
+    [Authorize(AuthenticationSchemes = "ApiKey")]
     [ProducesResponseType(typeof(LibroDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LibroDto>> PostLibro(CrearLibroDto dto)
     {

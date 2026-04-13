@@ -1,6 +1,8 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,8 +23,10 @@ public class CategoriasController : ControllerBase
 
     /// <summary>Obtiene todas las categorías</summary>
     [HttpGet]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(IEnumerable<CategoriaDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias()
     {
         var categorias = await _context.Categorias
@@ -34,8 +38,10 @@ public class CategoriasController : ControllerBase
 
     /// <summary>Obtiene una categoría por su ID</summary>
     [HttpGet("{id:int}")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(CategoriaDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CategoriaDto>> GetCategoria(int id)
     {
@@ -49,8 +55,10 @@ public class CategoriasController : ControllerBase
 
     /// <summary>Crea una nueva categoría</summary>
     [HttpPost]
+    [Authorize(AuthenticationSchemes = "ApiKey")]
     [ProducesResponseType(typeof(CategoriaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<CategoriaDto>> PostCategoria(CrearCategoriaDto dto)
     {
         var categoria = new Categoria
