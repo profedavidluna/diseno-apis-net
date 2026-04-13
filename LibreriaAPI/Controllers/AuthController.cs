@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -47,13 +48,16 @@ public class AuthController : ControllerBase
         var expectedUser = _config["DemoCredentials:Usuario"] ?? "admin";
         var expectedPass = _config["DemoCredentials:Contrasena"] ?? "password123";
 
-        var userBytes = System.Text.Encoding.UTF8.GetBytes(request.Usuario ?? string.Empty);
+        var userBytes = System.Text.Encoding.UTF8.GetBytes(request.Usuario);
         var expectedUserBytes = System.Text.Encoding.UTF8.GetBytes(expectedUser);
-        var passBytes = System.Text.Encoding.UTF8.GetBytes(request.Contrasena ?? string.Empty);
+        var passBytes = System.Text.Encoding.UTF8.GetBytes(request.Contrasena);
         var expectedPassBytes = System.Text.Encoding.UTF8.GetBytes(expectedPass);
 
-        bool userMatch = System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(userBytes, expectedUserBytes);
-        bool passMatch = System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(passBytes, expectedPassBytes);
+        // FixedTimeEquals requires equal-length spans; length mismatch is evaluated first.
+        bool userMatch = userBytes.Length == expectedUserBytes.Length &&
+            System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(userBytes, expectedUserBytes);
+        bool passMatch = passBytes.Length == expectedPassBytes.Length &&
+            System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(passBytes, expectedPassBytes);
 
         if (!userMatch || !passMatch)
             return Unauthorized(new { message = "Credenciales inválidas." });
@@ -81,8 +85,10 @@ public class AuthController : ControllerBase
     }
 }
 
-/// <summary>Request de login con credenciales dummy</summary>
-public record LoginRequest(string Usuario, string Contrasena);
+/// <summary>Request de login con credenciales de demostración</summary>
+public record LoginRequest(
+    [Required] string Usuario,
+    [Required] string Contrasena);
 
 /// <summary>Respuesta con JWT emitido</summary>
 public record TokenResponse(string Token, int ExpiresIn);

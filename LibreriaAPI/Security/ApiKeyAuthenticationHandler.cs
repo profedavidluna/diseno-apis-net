@@ -31,10 +31,13 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         if (string.IsNullOrWhiteSpace(providedKey))
             return Task.FromResult(AuthenticateResult.Fail("Invalid API Key."));
 
-        // Constant-time comparison to prevent timing attacks
+        // Constant-time comparison to prevent timing attacks.
+        // FixedTimeEquals requires equal-length spans; compare lengths first (not in constant time,
+        // but length leakage is acceptable compared to content leakage).
         var expectedKeyBytes = System.Text.Encoding.UTF8.GetBytes(Options.Value);
         var providedKeyBytes = System.Text.Encoding.UTF8.GetBytes(providedKey);
-        if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedKeyBytes, providedKeyBytes))
+        if (expectedKeyBytes.Length != providedKeyBytes.Length ||
+            !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedKeyBytes, providedKeyBytes))
             return Task.FromResult(AuthenticateResult.Fail("Invalid API Key."));
 
         var claims = new[] { new Claim(ClaimTypes.Name, "ApiKeyUser") };
