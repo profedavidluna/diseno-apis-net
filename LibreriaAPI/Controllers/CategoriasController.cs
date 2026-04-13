@@ -1,6 +1,7 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +21,7 @@ public class CategoriasController : ControllerBase
 
     /// <summary>Obtiene todas las categorías</summary>
     [HttpGet]
+    [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(IEnumerable<CategoriaDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias()
     {
@@ -32,6 +34,7 @@ public class CategoriasController : ControllerBase
 
     /// <summary>Obtiene una categoría por su ID</summary>
     [HttpGet("{id:int}")]
+    [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(CategoriaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CategoriaDto>> GetCategoria(int id)
@@ -73,6 +76,47 @@ public class CategoriasController : ControllerBase
 
         if (categoria is null)
             return NotFound();
+
+        categoria.Nombre = dto.Nombre;
+        categoria.Descripcion = dto.Descripcion;
+
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>Actualiza parcialmente una categoría usando JSON Patch (RFC 6902)</summary>
+    /// <remarks>
+    /// Ejemplo de body (application/json-patch+json):
+    ///
+    ///     [
+    ///       { "op": "replace", "path": "/nombre", "value": "Nueva Categoría" }
+    ///     ]
+    /// </remarks>
+    [HttpPatch("{id:int}")]
+    [Consumes("application/json-patch+json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PatchCategoria(int id, JsonPatchDocument<PatchCategoriaDto> patchDoc)
+    {
+        if (patchDoc is null)
+            return BadRequest();
+
+        var categoria = await _context.Categorias.FindAsync(id);
+
+        if (categoria is null)
+            return NotFound();
+
+        var dto = new PatchCategoriaDto
+        {
+            Nombre = categoria.Nombre,
+            Descripcion = categoria.Descripcion
+        };
+
+        patchDoc.ApplyTo(dto, ModelState);
+
+        if (!TryValidateModel(dto))
+            return ValidationProblem(ModelState);
 
         categoria.Nombre = dto.Nombre;
         categoria.Descripcion = dto.Descripcion;

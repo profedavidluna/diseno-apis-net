@@ -1,6 +1,7 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +21,7 @@ public class AutoresController : ControllerBase
 
     /// <summary>Obtiene todos los autores</summary>
     [HttpGet]
+    [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(IEnumerable<AutorDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<AutorDto>>> GetAutores()
     {
@@ -32,6 +34,7 @@ public class AutoresController : ControllerBase
 
     /// <summary>Obtiene un autor por su ID</summary>
     [HttpGet("{id:int}")]
+    [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(AutorDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AutorDto>> GetAutor(int id)
@@ -74,6 +77,49 @@ public class AutoresController : ControllerBase
 
         if (autor is null)
             return NotFound();
+
+        autor.Nombre = dto.Nombre;
+        autor.Apellido = dto.Apellido;
+        autor.Biografia = dto.Biografia;
+
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>Actualiza parcialmente un autor usando JSON Patch (RFC 6902)</summary>
+    /// <remarks>
+    /// Ejemplo de body (application/json-patch+json):
+    ///
+    ///     [
+    ///       { "op": "replace", "path": "/nombre", "value": "Nuevo Nombre" }
+    ///     ]
+    /// </remarks>
+    [HttpPatch("{id:int}")]
+    [Consumes("application/json-patch+json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PatchAutor(int id, JsonPatchDocument<PatchAutorDto> patchDoc)
+    {
+        if (patchDoc is null)
+            return BadRequest();
+
+        var autor = await _context.Autores.FindAsync(id);
+
+        if (autor is null)
+            return NotFound();
+
+        var dto = new PatchAutorDto
+        {
+            Nombre = autor.Nombre,
+            Apellido = autor.Apellido,
+            Biografia = autor.Biografia
+        };
+
+        patchDoc.ApplyTo(dto, ModelState);
+
+        if (!TryValidateModel(dto))
+            return ValidationProblem(ModelState);
 
         autor.Nombre = dto.Nombre;
         autor.Apellido = dto.Apellido;
