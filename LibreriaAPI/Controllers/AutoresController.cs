@@ -1,6 +1,8 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,8 +23,10 @@ public class AutoresController : ControllerBase
 
     /// <summary>Obtiene todos los autores</summary>
     [HttpGet]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(IEnumerable<AutorDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<AutorDto>>> GetAutores()
     {
         var autores = await _context.Autores
@@ -34,8 +38,10 @@ public class AutoresController : ControllerBase
 
     /// <summary>Obtiene un autor por su ID</summary>
     [HttpGet("{id:int}")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [ResponseCache(Duration = 60, VaryByHeader = "Accept")]
     [ProducesResponseType(typeof(AutorDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AutorDto>> GetAutor(int id)
     {
@@ -49,8 +55,10 @@ public class AutoresController : ControllerBase
 
     /// <summary>Crea un nuevo autor</summary>
     [HttpPost]
+    [Authorize(AuthenticationSchemes = "ApiKey")]
     [ProducesResponseType(typeof(AutorDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<AutorDto>> PostAutor(CrearAutorDto dto)
     {
         var autor = new Autor
