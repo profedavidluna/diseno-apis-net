@@ -1,0 +1,12 @@
+<Project>
+  <!-- Coverage settings applied to all test projects (those with IsTestProject=true) -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <CoverletOutput>$(MSBuildProjectDirectory)/coverage/</CoverletOutput>
+    <!-- Only measure coverage from the main project -->
+    <Include>[LibreriaAPI]*</Include>
+    <!-- Exclude test assemblies -->
+    <Exclude>[*.Tests]*,[xunit.*]*</Exclude>
+  </PropertyGroup>
+</Project>
