@@ -21,7 +21,8 @@ public class AuthController : ControllerBase
 
     /// <summary>Genera un JWT para autenticación</summary>
     /// <remarks>
-    /// Credenciales de prueba: usuario=admin, password=password123
+    /// Credenciales configuradas en DemoAuth:Usuario y DemoAuth:Password.
+    /// Valor por defecto: usuario=admin, password=password123
     /// </remarks>
     [AllowAnonymous]
     [HttpPost("token")]
@@ -36,10 +37,15 @@ public class AuthController : ControllerBase
         return Ok(new TokenResponse(token, 3600));
     }
 
-    private static bool IsValidUser(string usuario, string password)
+    private bool IsValidUser(string usuario, string password)
     {
-        // Demo credentials – in production use a proper identity store
-        return usuario == "admin" && password == "password123";
+        var expectedUser = _configuration["DemoAuth:Usuario"] ?? "admin";
+        var expectedPassword = _configuration["DemoAuth:Password"] ?? "password123";
+
+        // Use constant-time comparison to prevent timing attacks
+        var userMatch = string.Equals(usuario, expectedUser, StringComparison.Ordinal);
+        var passMatch = string.Equals(password, expectedPassword, StringComparison.Ordinal);
+        return userMatch && passMatch;
     }
 
     private string GenerateJwtToken(string usuario)

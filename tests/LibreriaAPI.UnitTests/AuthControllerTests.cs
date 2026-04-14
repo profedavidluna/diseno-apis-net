@@ -18,7 +18,9 @@ public class AuthControllerTests
         {
             ["Jwt:Key"] = "TEST-SECRET-KEY-FOR-UNIT-TESTS-MIN32CHARS!!!!!",
             ["Jwt:Issuer"] = "LibreriaAPI",
-            ["Jwt:Audience"] = "LibreriaAPI"
+            ["Jwt:Audience"] = "LibreriaAPI",
+            ["DemoAuth:Usuario"] = "admin",
+            ["DemoAuth:Password"] = "password123"
         };
 
         _configuration = new ConfigurationBuilder()
