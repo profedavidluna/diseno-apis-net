@@ -1,10 +1,8 @@
-using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
-using LibreriaAPI.Hateoas;
-using LibreriaAPI.Idempotency;
-using LibreriaAPI.Models;
+using LibreriaAPI.Features.Autores.Commands;
+using LibreriaAPI.Features.Autores.Queries;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LibreriaAPI.Controllers;
 
@@ -13,75 +11,44 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class AutoresController : ControllerBase
 {
-    private readonly LibreriaContext _context;
-    private readonly IHateoasService<AutorDto> _hateoasService;
+    private readonly IMediator _mediator;
 
-    public AutoresController(LibreriaContext context, IHateoasService<AutorDto> hateoasService)
+    public AutoresController(IMediator mediator)
     {
-        _context = context;
-        _hateoasService = hateoasService;
+        _mediator = mediator;
     }
 
     /// <summary>Obtiene todos los autores</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(HateoasResponse<IEnumerable<HateoasResponse<AutorDto>>>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<HateoasResponse<IEnumerable<HateoasResponse<AutorDto>>>>> GetAutores()
+    [ProducesResponseType(typeof(IEnumerable<AutorDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<AutorDto>>> GetAutores()
     {
-        var autores = await _context.Autores
-            .Select(a => new AutorDto(a.Id, a.Nombre, a.Apellido, a.Biografia))
-            .ToListAsync();
-
-        // Cada elemento lleva sus propios links
-        var items = autores.Select(a =>
-            new HateoasResponse<AutorDto>(a, _hateoasService.GenerateLinks(a, HttpContext)));
-
-        // La colección también lleva links de nivel superior (self, create)
-        var response = new HateoasResponse<IEnumerable<HateoasResponse<AutorDto>>>(
-            items,
-            _hateoasService.GenerateCollectionLinks(HttpContext));
-
-        return Ok(response);
+        var autores = await _mediator.Send(new GetAutoresQuery());
+        return Ok(autores);
     }
 
     /// <summary>Obtiene un autor por su ID</summary>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(HateoasResponse<AutorDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AutorDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<HateoasResponse<AutorDto>>> GetAutor(int id)
+    public async Task<ActionResult<AutorDto>> GetAutor(int id)
     {
-        var autor = await _context.Autores.FindAsync(id);
+        var autor = await _mediator.Send(new GetAutorByIdQuery(id));
 
         if (autor is null)
             return NotFound();
 
-        var dto = new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia);
-        var response = new HateoasResponse<AutorDto>(dto, _hateoasService.GenerateLinks(dto, HttpContext));
-
-        return Ok(response);
+        return Ok(autor);
     }
 
     /// <summary>Crea un nuevo autor</summary>
-    /// <remarks>Requiere el encabezado 'Idempotency-Key' (UUID). Si se repite la clave, se devuelve la respuesta original.</remarks>
     [HttpPost]
-    [ServiceFilter(typeof(IdempotencyFilter))]
-    [ProducesResponseType(typeof(HateoasResponse<AutorDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(AutorDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<HateoasResponse<AutorDto>>> PostAutor(CrearAutorDto dto)
+    public async Task<ActionResult<AutorDto>> PostAutor(CrearAutorDto dto)
     {
-        var autor = new Autor
-        {
-            Nombre = dto.Nombre,
-            Apellido = dto.Apellido,
-            Biografia = dto.Biografia
-        };
-
-        _context.Autores.Add(autor);
-        await _context.SaveChangesAsync();
-
-        var result = new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia);
-        var response = new HateoasResponse<AutorDto>(result, _hateoasService.GenerateLinks(result, HttpContext));
-
-        return CreatedAtAction(nameof(GetAutor), new { id = autor.Id }, response);
+        var result = await _mediator.Send(new CrearAutorCommand(dto.Nombre, dto.Apellido, dto.Biografia));
+        return CreatedAtAction(nameof(GetAutor), new { id = result.Id }, result);
     }
 
     /// <summary>Actualiza un autor existente</summary>
@@ -90,16 +57,11 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutAutor(int id, ActualizarAutorDto dto)
     {
-        var autor = await _context.Autores.FindAsync(id);
+        var found = await _mediator.Send(new ActualizarAutorCommand(id, dto.Nombre, dto.Apellido, dto.Biografia));
 
-        if (autor is null)
+        if (!found)
             return NotFound();
 
-        autor.Nombre = dto.Nombre;
-        autor.Apellido = dto.Apellido;
-        autor.Biografia = dto.Biografia;
-
-        await _context.SaveChangesAsync();
         return NoContent();
     }
 
@@ -109,13 +71,11 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteAutor(int id)
     {
-        var autor = await _context.Autores.FindAsync(id);
+        var found = await _mediator.Send(new EliminarAutorCommand(id));
 
-        if (autor is null)
+        if (!found)
             return NotFound();
 
-        _context.Autores.Remove(autor);
-        await _context.SaveChangesAsync();
         return NoContent();
     }
 }

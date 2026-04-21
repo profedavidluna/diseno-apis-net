@@ -1,10 +1,8 @@
-using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
-using LibreriaAPI.Hateoas;
-using LibreriaAPI.Idempotency;
-using LibreriaAPI.Models;
+using LibreriaAPI.Features.Libros.Commands;
+using LibreriaAPI.Features.Libros.Queries;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LibreriaAPI.Controllers;
 
@@ -13,168 +11,59 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class LibrosController : ControllerBase
 {
-    private readonly LibreriaContext _context;
-    private readonly IHateoasService<LibroDto> _hateoasService;
+    private readonly IMediator _mediator;
 
-    public LibrosController(LibreriaContext context, IHateoasService<LibroDto> hateoasService)
+    public LibrosController(IMediator mediator)
     {
-        _context = context;
-        _hateoasService = hateoasService;
+        _mediator = mediator;
     }
 
     /// <summary>Obtiene todos los libros con su categoría y autores</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>>> GetLibros()
+    [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibros()
     {
-        var libros = await _context.Libros
-            .Include(l => l.Categoria)
-            .Include(l => l.LibroAutores)
-                .ThenInclude(la => la.Autor)
-            .Select(l => new LibroDto(
-                l.Id,
-                l.Titulo,
-                l.Descripcion,
-                l.ISBN,
-                l.AnioPublicacion,
-                l.CategoriaId,
-                l.Categoria != null ? l.Categoria.Nombre : null,
-                l.LibroAutores.Select(la => new AutorDto(
-                    la.Autor!.Id,
-                    la.Autor.Nombre,
-                    la.Autor.Apellido,
-                    la.Autor.Biografia
-                ))
-            ))
-            .ToListAsync();
-
-        var items = libros.Select(l =>
-            new HateoasResponse<LibroDto>(l, _hateoasService.GenerateLinks(l, HttpContext)));
-
-        var response = new HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>(
-            items,
-            _hateoasService.GenerateCollectionLinks(HttpContext));
-
-        return Ok(response);
+        var libros = await _mediator.Send(new GetLibrosQuery());
+        return Ok(libros);
     }
 
     /// <summary>Obtiene un libro por su ID</summary>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(HateoasResponse<LibroDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(LibroDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<HateoasResponse<LibroDto>>> GetLibro(int id)
+    public async Task<ActionResult<LibroDto>> GetLibro(int id)
     {
-        var libro = await _context.Libros
-            .Include(l => l.Categoria)
-            .Include(l => l.LibroAutores)
-                .ThenInclude(la => la.Autor)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        var libro = await _mediator.Send(new GetLibroByIdQuery(id));
 
         if (libro is null)
             return NotFound();
 
-        var dto = new LibroDto(
-            libro.Id,
-            libro.Titulo,
-            libro.Descripcion,
-            libro.ISBN,
-            libro.AnioPublicacion,
-            libro.CategoriaId,
-            libro.Categoria?.Nombre,
-            libro.LibroAutores.Select(la => new AutorDto(
-                la.Autor!.Id,
-                la.Autor.Nombre,
-                la.Autor.Apellido,
-                la.Autor.Biografia
-            ))
-        );
-
-        var response = new HateoasResponse<LibroDto>(dto, _hateoasService.GenerateLinks(dto, HttpContext));
-        return Ok(response);
+        return Ok(libro);
     }
 
     /// <summary>Obtiene los libros de una categoría específica</summary>
     [HttpGet("categoria/{categoriaId:int}")]
-    [ProducesResponseType(typeof(HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>>> GetLibrosPorCategoria(int categoriaId)
+    [ProducesResponseType(typeof(IEnumerable<LibroDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibrosPorCategoria(int categoriaId)
     {
-        var libros = await _context.Libros
-            .Where(l => l.CategoriaId == categoriaId)
-            .Include(l => l.Categoria)
-            .Include(l => l.LibroAutores)
-                .ThenInclude(la => la.Autor)
-            .Select(l => new LibroDto(
-                l.Id,
-                l.Titulo,
-                l.Descripcion,
-                l.ISBN,
-                l.AnioPublicacion,
-                l.CategoriaId,
-                l.Categoria != null ? l.Categoria.Nombre : null,
-                l.LibroAutores.Select(la => new AutorDto(
-                    la.Autor!.Id,
-                    la.Autor.Nombre,
-                    la.Autor.Apellido,
-                    la.Autor.Biografia
-                ))
-            ))
-            .ToListAsync();
-
-        var items = libros.Select(l =>
-            new HateoasResponse<LibroDto>(l, _hateoasService.GenerateLinks(l, HttpContext)));
-
-        var response = new HateoasResponse<IEnumerable<HateoasResponse<LibroDto>>>(
-            items,
-            _hateoasService.GenerateCollectionLinks(HttpContext));
-
-        return Ok(response);
+        var libros = await _mediator.Send(new GetLibrosPorCategoriaQuery(categoriaId));
+        return Ok(libros);
     }
 
     /// <summary>Crea un nuevo libro</summary>
-    /// <remarks>Requiere el encabezado 'Idempotency-Key' (UUID). Si se repite la clave, se devuelve la respuesta original.</remarks>
     [HttpPost]
-    [ServiceFilter(typeof(IdempotencyFilter))]
-    [ProducesResponseType(typeof(HateoasResponse<LibroDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(LibroDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<HateoasResponse<LibroDto>>> PostLibro(CrearLibroDto dto)
+    public async Task<ActionResult<LibroDto>> PostLibro(CrearLibroDto dto)
     {
-        var categoria = await _context.Categorias.FindAsync(dto.CategoriaId);
-        if (categoria is null)
-            return NotFound($"Categoría con Id {dto.CategoriaId} no encontrada.");
+        var result = await _mediator.Send(new CrearLibroCommand(
+            dto.Titulo, dto.Descripcion, dto.ISBN, dto.AnioPublicacion, dto.CategoriaId, dto.AutoresIds));
 
-        var autores = await _context.Autores
-            .Where(a => dto.AutoresIds.Contains(a.Id))
-            .ToListAsync();
+        if (result.Error is not null)
+            return result.Libro is null ? NotFound(result.Error) : BadRequest(result.Error);
 
-        if (autores.Count != dto.AutoresIds.Count())
-            return BadRequest("Uno o más autores no fueron encontrados.");
-
-        var libro = new Libro
-        {
-            Titulo = dto.Titulo,
-            Descripcion = dto.Descripcion,
-            ISBN = dto.ISBN,
-            AnioPublicacion = dto.AnioPublicacion,
-            CategoriaId = dto.CategoriaId
-        };
-
-        _context.Libros.Add(libro);
-        await _context.SaveChangesAsync();
-
-        foreach (var autor in autores)
-        {
-            _context.LibroAutores.Add(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id });
-        }
-        await _context.SaveChangesAsync();
-
-        var libroDto = await BuildLibroDto(libro.Id);
-        if (libroDto is null)
-            return StatusCode(StatusCodes.Status500InternalServerError, "Error al recuperar el libro creado.");
-
-        var response = new HateoasResponse<LibroDto>(libroDto, _hateoasService.GenerateLinks(libroDto, HttpContext));
-
-        return CreatedAtAction(nameof(GetLibro), new { id = libro.Id }, response);
+        return CreatedAtAction(nameof(GetLibro), new { id = result.Libro!.Id }, result.Libro);
     }
 
     /// <summary>Actualiza un libro existente</summary>
@@ -184,37 +73,15 @@ public class LibrosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutLibro(int id, ActualizarLibroDto dto)
     {
-        var libro = await _context.Libros
-            .Include(l => l.LibroAutores)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        var result = await _mediator.Send(new ActualizarLibroCommand(
+            id, dto.Titulo, dto.Descripcion, dto.ISBN, dto.AnioPublicacion, dto.CategoriaId, dto.AutoresIds));
 
-        if (libro is null)
+        if (!result.Encontrado)
             return NotFound();
 
-        var categoria = await _context.Categorias.FindAsync(dto.CategoriaId);
-        if (categoria is null)
-            return NotFound($"Categoría con Id {dto.CategoriaId} no encontrada.");
+        if (result.Error is not null)
+            return BadRequest(result.Error);
 
-        var autores = await _context.Autores
-            .Where(a => dto.AutoresIds.Contains(a.Id))
-            .ToListAsync();
-
-        if (autores.Count != dto.AutoresIds.Count())
-            return BadRequest("Uno o más autores no fueron encontrados.");
-
-        libro.Titulo = dto.Titulo;
-        libro.Descripcion = dto.Descripcion;
-        libro.ISBN = dto.ISBN;
-        libro.AnioPublicacion = dto.AnioPublicacion;
-        libro.CategoriaId = dto.CategoriaId;
-
-        _context.LibroAutores.RemoveRange(libro.LibroAutores);
-        foreach (var autor in autores)
-        {
-            _context.LibroAutores.Add(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id });
-        }
-
-        await _context.SaveChangesAsync();
         return NoContent();
     }
 
@@ -224,44 +91,11 @@ public class LibrosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteLibro(int id)
     {
-        var libro = await _context.Libros
-            .Include(l => l.LibroAutores)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        var found = await _mediator.Send(new EliminarLibroCommand(id));
 
-        if (libro is null)
+        if (!found)
             return NotFound();
 
-        _context.LibroAutores.RemoveRange(libro.LibroAutores);
-        _context.Libros.Remove(libro);
-        await _context.SaveChangesAsync();
         return NoContent();
-    }
-
-    private async Task<LibroDto?> BuildLibroDto(int id)
-    {
-        var libro = await _context.Libros
-            .Include(l => l.Categoria)
-            .Include(l => l.LibroAutores)
-                .ThenInclude(la => la.Autor)
-            .FirstOrDefaultAsync(l => l.Id == id);
-
-        if (libro is null)
-            return null;
-
-        return new LibroDto(
-            libro.Id,
-            libro.Titulo,
-            libro.Descripcion,
-            libro.ISBN,
-            libro.AnioPublicacion,
-            libro.CategoriaId,
-            libro.Categoria?.Nombre,
-            libro.LibroAutores.Select(la => new AutorDto(
-                la.Autor!.Id,
-                la.Autor.Nombre,
-                la.Autor.Apellido,
-                la.Autor.Biografia
-            ))
-        );
     }
 }

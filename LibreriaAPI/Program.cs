@@ -1,7 +1,5 @@
 using LibreriaAPI.Data;
-using LibreriaAPI.DTOs;
-using LibreriaAPI.Hateoas;
-using LibreriaAPI.Idempotency;
+using LibreriaAPI.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -11,21 +9,17 @@ var builder = WebApplication.CreateBuilder(args);
 // Controllers
 builder.Services.AddControllers();
 
-// IMemoryCache – requerido por IdempotencyService
-builder.Services.AddMemoryCache();
-
-// HATEOAS – servicios que generan los links por tipo de recurso
-builder.Services.AddScoped<IHateoasService<AutorDto>, AutorHateoasService>();
-builder.Services.AddScoped<IHateoasService<CategoriaDto>, CategoriaHateoasService>();
-builder.Services.AddScoped<IHateoasService<LibroDto>, LibroHateoasService>();
-
-// Idempotencia – servicio singleton para cachear respuestas por clave
-builder.Services.AddSingleton<IIdempotencyService, IdempotencyService>();
-builder.Services.AddScoped<IdempotencyFilter>();
-
 // EF Core - Base de datos en memoria
 builder.Services.AddDbContext<LibreriaContext>(options =>
     options.UseInMemoryDatabase("LibreriaDB"));
+
+// Repositories
+builder.Services.AddScoped<IAutoresRepository, AutoresRepository>();
+builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
+builder.Services.AddScoped<ILibrosRepository, LibrosRepository>();
+
+// MediatR
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -35,7 +29,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Librería API",
         Version = "v1",
-        Description = "API REST para gestionar libros, categorías y autores de una librería. Implementa HATEOAS: cada respuesta incluye una lista de links que describen las acciones disponibles sobre el recurso.",
+        Description = "API REST para gestionar libros, categorías y autores de una librería.",
         Contact = new OpenApiContact
         {
             Name = "Librería",
@@ -48,9 +42,6 @@ builder.Services.AddSwaggerGen(c =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
         c.IncludeXmlComments(xmlPath);
-
-    // Documenta el encabezado Idempotency-Key en todos los endpoints POST
-    c.OperationFilter<IdempotencyOperationFilter>();
 });
 
 var app = builder.Build();

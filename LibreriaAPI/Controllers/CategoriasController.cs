@@ -1,10 +1,8 @@
-using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
-using LibreriaAPI.Hateoas;
-using LibreriaAPI.Idempotency;
-using LibreriaAPI.Models;
+using LibreriaAPI.Features.Categorias.Commands;
+using LibreriaAPI.Features.Categorias.Queries;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LibreriaAPI.Controllers;
 
@@ -13,72 +11,44 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class CategoriasController : ControllerBase
 {
-    private readonly LibreriaContext _context;
-    private readonly IHateoasService<CategoriaDto> _hateoasService;
+    private readonly IMediator _mediator;
 
-    public CategoriasController(LibreriaContext context, IHateoasService<CategoriaDto> hateoasService)
+    public CategoriasController(IMediator mediator)
     {
-        _context = context;
-        _hateoasService = hateoasService;
+        _mediator = mediator;
     }
 
     /// <summary>Obtiene todas las categorías</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(HateoasResponse<IEnumerable<HateoasResponse<CategoriaDto>>>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<HateoasResponse<IEnumerable<HateoasResponse<CategoriaDto>>>>> GetCategorias()
+    [ProducesResponseType(typeof(IEnumerable<CategoriaDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias()
     {
-        var categorias = await _context.Categorias
-            .Select(c => new CategoriaDto(c.Id, c.Nombre, c.Descripcion))
-            .ToListAsync();
-
-        var items = categorias.Select(c =>
-            new HateoasResponse<CategoriaDto>(c, _hateoasService.GenerateLinks(c, HttpContext)));
-
-        var response = new HateoasResponse<IEnumerable<HateoasResponse<CategoriaDto>>>(
-            items,
-            _hateoasService.GenerateCollectionLinks(HttpContext));
-
-        return Ok(response);
+        var categorias = await _mediator.Send(new GetCategoriasQuery());
+        return Ok(categorias);
     }
 
     /// <summary>Obtiene una categoría por su ID</summary>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(HateoasResponse<CategoriaDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(CategoriaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<HateoasResponse<CategoriaDto>>> GetCategoria(int id)
+    public async Task<ActionResult<CategoriaDto>> GetCategoria(int id)
     {
-        var categoria = await _context.Categorias.FindAsync(id);
+        var categoria = await _mediator.Send(new GetCategoriaByIdQuery(id));
 
         if (categoria is null)
             return NotFound();
 
-        var dto = new CategoriaDto(categoria.Id, categoria.Nombre, categoria.Descripcion);
-        var response = new HateoasResponse<CategoriaDto>(dto, _hateoasService.GenerateLinks(dto, HttpContext));
-
-        return Ok(response);
+        return Ok(categoria);
     }
 
     /// <summary>Crea una nueva categoría</summary>
-    /// <remarks>Requiere el encabezado 'Idempotency-Key' (UUID). Si se repite la clave, se devuelve la respuesta original.</remarks>
     [HttpPost]
-    [ServiceFilter(typeof(IdempotencyFilter))]
-    [ProducesResponseType(typeof(HateoasResponse<CategoriaDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(CategoriaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<HateoasResponse<CategoriaDto>>> PostCategoria(CrearCategoriaDto dto)
+    public async Task<ActionResult<CategoriaDto>> PostCategoria(CrearCategoriaDto dto)
     {
-        var categoria = new Categoria
-        {
-            Nombre = dto.Nombre,
-            Descripcion = dto.Descripcion
-        };
-
-        _context.Categorias.Add(categoria);
-        await _context.SaveChangesAsync();
-
-        var result = new CategoriaDto(categoria.Id, categoria.Nombre, categoria.Descripcion);
-        var response = new HateoasResponse<CategoriaDto>(result, _hateoasService.GenerateLinks(result, HttpContext));
-
-        return CreatedAtAction(nameof(GetCategoria), new { id = categoria.Id }, response);
+        var result = await _mediator.Send(new CrearCategoriaCommand(dto.Nombre, dto.Descripcion));
+        return CreatedAtAction(nameof(GetCategoria), new { id = result.Id }, result);
     }
 
     /// <summary>Actualiza una categoría existente</summary>
@@ -87,15 +57,11 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutCategoria(int id, ActualizarCategoriaDto dto)
     {
-        var categoria = await _context.Categorias.FindAsync(id);
+        var found = await _mediator.Send(new ActualizarCategoriaCommand(id, dto.Nombre, dto.Descripcion));
 
-        if (categoria is null)
+        if (!found)
             return NotFound();
 
-        categoria.Nombre = dto.Nombre;
-        categoria.Descripcion = dto.Descripcion;
-
-        await _context.SaveChangesAsync();
         return NoContent();
     }
 
@@ -105,13 +71,11 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteCategoria(int id)
     {
-        var categoria = await _context.Categorias.FindAsync(id);
+        var found = await _mediator.Send(new EliminarCategoriaCommand(id));
 
-        if (categoria is null)
+        if (!found)
             return NotFound();
 
-        _context.Categorias.Remove(categoria);
-        await _context.SaveChangesAsync();
         return NoContent();
     }
 }
