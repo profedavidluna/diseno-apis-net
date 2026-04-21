@@ -1,6 +1,7 @@
 using LibreriaAPI.DTOs;
-using LibreriaAPI.Models;
-using LibreriaAPI.Repositories;
+using LibreriaAPI.Features.Autores.Commands;
+using LibreriaAPI.Features.Autores.Queries;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibreriaAPI.Controllers;
@@ -10,11 +11,11 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class AutoresController : ControllerBase
 {
-    private readonly IAutoresRepository _repository;
+    private readonly IMediator _mediator;
 
-    public AutoresController(IAutoresRepository repository)
+    public AutoresController(IMediator mediator)
     {
-        _repository = repository;
+        _mediator = mediator;
     }
 
     /// <summary>Obtiene todos los autores</summary>
@@ -22,7 +23,7 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<AutorDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<AutorDto>>> GetAutores()
     {
-        var autores = await _repository.GetAllAsync();
+        var autores = await _mediator.Send(new GetAutoresQuery());
         return Ok(autores);
     }
 
@@ -32,12 +33,12 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AutorDto>> GetAutor(int id)
     {
-        var autor = await _repository.GetByIdAsync(id);
+        var autor = await _mediator.Send(new GetAutorByIdQuery(id));
 
         if (autor is null)
             return NotFound();
 
-        return Ok(new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia));
+        return Ok(autor);
     }
 
     /// <summary>Crea un nuevo autor</summary>
@@ -46,18 +47,8 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<AutorDto>> PostAutor(CrearAutorDto dto)
     {
-        var autor = new Autor
-        {
-            Nombre = dto.Nombre,
-            Apellido = dto.Apellido,
-            Biografia = dto.Biografia
-        };
-
-        await _repository.AddAsync(autor);
-        await _repository.SaveChangesAsync();
-
-        var result = new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia);
-        return CreatedAtAction(nameof(GetAutor), new { id = autor.Id }, result);
+        var result = await _mediator.Send(new CrearAutorCommand(dto.Nombre, dto.Apellido, dto.Biografia));
+        return CreatedAtAction(nameof(GetAutor), new { id = result.Id }, result);
     }
 
     /// <summary>Actualiza un autor existente</summary>
@@ -66,16 +57,11 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutAutor(int id, ActualizarAutorDto dto)
     {
-        var autor = await _repository.GetByIdAsync(id);
+        var found = await _mediator.Send(new ActualizarAutorCommand(id, dto.Nombre, dto.Apellido, dto.Biografia));
 
-        if (autor is null)
+        if (!found)
             return NotFound();
 
-        autor.Nombre = dto.Nombre;
-        autor.Apellido = dto.Apellido;
-        autor.Biografia = dto.Biografia;
-
-        await _repository.SaveChangesAsync();
         return NoContent();
     }
 
@@ -85,13 +71,11 @@ public class AutoresController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteAutor(int id)
     {
-        var autor = await _repository.GetByIdAsync(id);
+        var found = await _mediator.Send(new EliminarAutorCommand(id));
 
-        if (autor is null)
+        if (!found)
             return NotFound();
 
-        _repository.Remove(autor);
-        await _repository.SaveChangesAsync();
         return NoContent();
     }
 }

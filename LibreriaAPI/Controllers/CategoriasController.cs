@@ -1,6 +1,7 @@
 using LibreriaAPI.DTOs;
-using LibreriaAPI.Models;
-using LibreriaAPI.Repositories;
+using LibreriaAPI.Features.Categorias.Commands;
+using LibreriaAPI.Features.Categorias.Queries;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibreriaAPI.Controllers;
@@ -10,11 +11,11 @@ namespace LibreriaAPI.Controllers;
 [Produces("application/json")]
 public class CategoriasController : ControllerBase
 {
-    private readonly ICategoriasRepository _repository;
+    private readonly IMediator _mediator;
 
-    public CategoriasController(ICategoriasRepository repository)
+    public CategoriasController(IMediator mediator)
     {
-        _repository = repository;
+        _mediator = mediator;
     }
 
     /// <summary>Obtiene todas las categorías</summary>
@@ -22,7 +23,7 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<CategoriaDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias()
     {
-        var categorias = await _repository.GetAllAsync();
+        var categorias = await _mediator.Send(new GetCategoriasQuery());
         return Ok(categorias);
     }
 
@@ -32,12 +33,12 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CategoriaDto>> GetCategoria(int id)
     {
-        var categoria = await _repository.GetByIdAsync(id);
+        var categoria = await _mediator.Send(new GetCategoriaByIdQuery(id));
 
         if (categoria is null)
             return NotFound();
 
-        return Ok(new CategoriaDto(categoria.Id, categoria.Nombre, categoria.Descripcion));
+        return Ok(categoria);
     }
 
     /// <summary>Crea una nueva categoría</summary>
@@ -46,17 +47,8 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CategoriaDto>> PostCategoria(CrearCategoriaDto dto)
     {
-        var categoria = new Categoria
-        {
-            Nombre = dto.Nombre,
-            Descripcion = dto.Descripcion
-        };
-
-        await _repository.AddAsync(categoria);
-        await _repository.SaveChangesAsync();
-
-        var result = new CategoriaDto(categoria.Id, categoria.Nombre, categoria.Descripcion);
-        return CreatedAtAction(nameof(GetCategoria), new { id = categoria.Id }, result);
+        var result = await _mediator.Send(new CrearCategoriaCommand(dto.Nombre, dto.Descripcion));
+        return CreatedAtAction(nameof(GetCategoria), new { id = result.Id }, result);
     }
 
     /// <summary>Actualiza una categoría existente</summary>
@@ -65,15 +57,11 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutCategoria(int id, ActualizarCategoriaDto dto)
     {
-        var categoria = await _repository.GetByIdAsync(id);
+        var found = await _mediator.Send(new ActualizarCategoriaCommand(id, dto.Nombre, dto.Descripcion));
 
-        if (categoria is null)
+        if (!found)
             return NotFound();
 
-        categoria.Nombre = dto.Nombre;
-        categoria.Descripcion = dto.Descripcion;
-
-        await _repository.SaveChangesAsync();
         return NoContent();
     }
 
@@ -83,13 +71,11 @@ public class CategoriasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteCategoria(int id)
     {
-        var categoria = await _repository.GetByIdAsync(id);
+        var found = await _mediator.Send(new EliminarCategoriaCommand(id));
 
-        if (categoria is null)
+        if (!found)
             return NotFound();
 
-        _repository.Remove(categoria);
-        await _repository.SaveChangesAsync();
         return NoContent();
     }
 }
