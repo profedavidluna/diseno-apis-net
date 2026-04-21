@@ -34,6 +34,12 @@ public class LibroCreadoEventHandler : INotificationHandler<LibroCreadoEvent>
         };
 
         await _readContext.Libros.AddAsync(readModel, cancellationToken);
+
+        // Mantener la tabla de índice libro-autor para búsquedas eficientes
+        foreach (var autor in libro.Autores)
+            await _readContext.LibroAutores.AddAsync(
+                new LibroAutorReadModel { LibroId = libro.Id, AutorId = autor.Id }, cancellationToken);
+
         await _readContext.SaveChangesAsync(cancellationToken);
     }
 }

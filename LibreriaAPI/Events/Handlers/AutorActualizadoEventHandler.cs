@@ -9,7 +9,8 @@ namespace LibreriaAPI.Events.Handlers;
 
 /// <summary>
 /// Sincroniza la BD de lectura cuando un autor es actualizado en la BD de escritura.
-/// También actualiza la info desnormalizada del autor en todos los LibroReadModel afectados.
+/// También actualiza la info desnormalizada del autor en todos los LibroReadModel afectados,
+/// usando la tabla de índice LibroAutorReadModel para localizar solo los libros necesarios.
 /// </summary>
 public class AutorActualizadoEventHandler : INotificationHandler<AutorActualizadoEvent>
 {
@@ -33,13 +34,19 @@ public class AutorActualizadoEventHandler : INotificationHandler<AutorActualizad
             readModel.Biografia = autor.Biografia;
         }
 
-        // Actualizar la info desnormalizada del autor en todos los libros afectados
-        var libros = await _readContext.Libros.ToListAsync(cancellationToken);
-        foreach (var libro in libros)
-        {
-            var autores = JsonSerializer.Deserialize<List<AutorDto>>(libro.AutoresJson)
-                          ?? [];
+        // Localizar eficientemente solo los libros que tienen este autor usando el índice
+        var libroIds = await _readContext.LibroAutores
+            .Where(la => la.AutorId == autor.Id)
+            .Select(la => la.LibroId)
+            .ToListAsync(cancellationToken);
 
+        var librosAfectados = await _readContext.Libros
+            .Where(l => libroIds.Contains(l.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var libro in librosAfectados)
+        {
+            var autores = JsonSerializer.Deserialize<List<AutorDto>>(libro.AutoresJson) ?? [];
             var index = autores.FindIndex(a => a.Id == autor.Id);
             if (index >= 0)
             {

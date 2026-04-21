@@ -1,6 +1,7 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.Events;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace LibreriaAPI.Events.Handlers;
 
@@ -23,6 +24,13 @@ public class LibroEliminadoEventHandler : INotificationHandler<LibroEliminadoEve
         if (readModel is null) return;
 
         _readContext.Libros.Remove(readModel);
+
+        // Limpiar la tabla de índice libro-autor
+        var links = await _readContext.LibroAutores
+            .Where(la => la.LibroId == notification.LibroId)
+            .ToListAsync(cancellationToken);
+        _readContext.LibroAutores.RemoveRange(links);
+
         await _readContext.SaveChangesAsync(cancellationToken);
     }
 }

@@ -14,4 +14,13 @@ public class LibreriaReadContext : DbContext
     public DbSet<LibroReadModel> Libros => Set<LibroReadModel>();
     public DbSet<AutorReadModel> Autores => Set<AutorReadModel>();
     public DbSet<CategoriaReadModel> Categorias => Set<CategoriaReadModel>();
+    public DbSet<LibroAutorReadModel> LibroAutores => Set<LibroAutorReadModel>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<LibroAutorReadModel>()
+            .HasKey(la => new { la.LibroId, la.AutorId });
+    }
 }

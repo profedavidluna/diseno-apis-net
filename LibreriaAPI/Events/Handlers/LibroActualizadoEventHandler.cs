@@ -1,5 +1,6 @@
 using LibreriaAPI.Data;
 using LibreriaAPI.Events;
+using LibreriaAPI.Models.ReadModels;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -32,6 +33,16 @@ public class LibroActualizadoEventHandler : INotificationHandler<LibroActualizad
         readModel.CategoriaId = libro.CategoriaId;
         readModel.CategoriaNombre = libro.CategoriaNombre;
         readModel.AutoresJson = JsonSerializer.Serialize(libro.Autores);
+
+        // Actualizar la tabla de índice libro-autor
+        var oldLinks = await _readContext.LibroAutores
+            .Where(la => la.LibroId == libro.Id)
+            .ToListAsync(cancellationToken);
+        _readContext.LibroAutores.RemoveRange(oldLinks);
+
+        foreach (var autor in libro.Autores)
+            await _readContext.LibroAutores.AddAsync(
+                new LibroAutorReadModel { LibroId = libro.Id, AutorId = autor.Id }, cancellationToken);
 
         await _readContext.SaveChangesAsync(cancellationToken);
     }

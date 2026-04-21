@@ -74,7 +74,7 @@ using (var scope = app.Services.CreateScope())
     foreach (var a in writeContext.Autores)
         readContext.Autores.Add(new AutorReadModel { Id = a.Id, Nombre = a.Nombre, Apellido = a.Apellido, Biografia = a.Biografia });
 
-    // Seed Libros read models (denormalized)
+    // Seed Libros read models (denormalized) + índice libro-autor
     var libros = writeContext.Libros
         .Include(l => l.Categoria)
         .Include(l => l.LibroAutores)
@@ -98,6 +98,9 @@ using (var scope = app.Services.CreateScope())
             CategoriaNombre = l.Categoria?.Nombre,
             AutoresJson = JsonSerializer.Serialize(autoresDto)
         });
+
+        foreach (var la in l.LibroAutores)
+            readContext.LibroAutores.Add(new LibroAutorReadModel { LibroId = l.Id, AutorId = la.AutorId });
     }
 
     readContext.SaveChanges();
