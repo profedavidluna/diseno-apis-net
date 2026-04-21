@@ -6,9 +6,9 @@ namespace LibreriaAPI.Features.Libros.Queries;
 
 public class GetLibrosPorCategoriaQueryHandler : IRequestHandler<GetLibrosPorCategoriaQuery, IEnumerable<LibroDto>>
 {
-    private readonly ILibrosRepository _repository;
+    private readonly ILibrosReadRepository _repository;
 
-    public GetLibrosPorCategoriaQueryHandler(ILibrosRepository repository)
+    public GetLibrosPorCategoriaQueryHandler(ILibrosReadRepository repository)
     {
         _repository = repository;
     }

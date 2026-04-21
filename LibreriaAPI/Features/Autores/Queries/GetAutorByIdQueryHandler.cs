@@ -6,17 +6,13 @@ namespace LibreriaAPI.Features.Autores.Queries;
 
 public class GetAutorByIdQueryHandler : IRequestHandler<GetAutorByIdQuery, AutorDto?>
 {
-    private readonly IAutoresRepository _repository;
+    private readonly IAutoresReadRepository _repository;
 
-    public GetAutorByIdQueryHandler(IAutoresRepository repository)
+    public GetAutorByIdQueryHandler(IAutoresReadRepository repository)
     {
         _repository = repository;
     }
 
     public async Task<AutorDto?> Handle(GetAutorByIdQuery request, CancellationToken cancellationToken)
-    {
-        var autor = await _repository.GetByIdAsync(request.Id);
-        if (autor is null) return null;
-        return new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia);
-    }
+        => await _repository.GetByIdAsync(request.Id);
 }

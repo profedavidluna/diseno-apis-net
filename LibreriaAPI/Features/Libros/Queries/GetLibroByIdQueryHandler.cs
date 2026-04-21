@@ -6,9 +6,9 @@ namespace LibreriaAPI.Features.Libros.Queries;
 
 public class GetLibroByIdQueryHandler : IRequestHandler<GetLibroByIdQuery, LibroDto?>
 {
-    private readonly ILibrosRepository _repository;
+    private readonly ILibrosReadRepository _repository;
 
-    public GetLibroByIdQueryHandler(ILibrosRepository repository)
+    public GetLibroByIdQueryHandler(ILibrosReadRepository repository)
     {
         _repository = repository;
     }

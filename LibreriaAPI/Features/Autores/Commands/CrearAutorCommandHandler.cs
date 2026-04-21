@@ -1,4 +1,5 @@
 using LibreriaAPI.DTOs;
+using LibreriaAPI.Events;
 using LibreriaAPI.Models;
 using LibreriaAPI.Repositories;
 using MediatR;
@@ -8,10 +9,12 @@ namespace LibreriaAPI.Features.Autores.Commands;
 public class CrearAutorCommandHandler : IRequestHandler<CrearAutorCommand, AutorDto>
 {
     private readonly IAutoresRepository _repository;
+    private readonly IPublisher _publisher;
 
-    public CrearAutorCommandHandler(IAutoresRepository repository)
+    public CrearAutorCommandHandler(IAutoresRepository repository, IPublisher publisher)
     {
         _repository = repository;
+        _publisher = publisher;
     }
 
     public async Task<AutorDto> Handle(CrearAutorCommand request, CancellationToken cancellationToken)
@@ -26,6 +29,9 @@ public class CrearAutorCommandHandler : IRequestHandler<CrearAutorCommand, Autor
         await _repository.AddAsync(autor);
         await _repository.SaveChangesAsync();
 
-        return new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia);
+        var autorDto = new AutorDto(autor.Id, autor.Nombre, autor.Apellido, autor.Biografia);
+        await _publisher.Publish(new AutorCreadoEvent(autorDto), cancellationToken);
+
+        return autorDto;
     }
 }

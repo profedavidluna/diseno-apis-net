@@ -6,9 +6,9 @@ namespace LibreriaAPI.Features.Autores.Queries;
 
 public class GetAutoresQueryHandler : IRequestHandler<GetAutoresQuery, IEnumerable<AutorDto>>
 {
-    private readonly IAutoresRepository _repository;
+    private readonly IAutoresReadRepository _repository;
 
-    public GetAutoresQueryHandler(IAutoresRepository repository)
+    public GetAutoresQueryHandler(IAutoresReadRepository repository)
     {
         _repository = repository;
     }

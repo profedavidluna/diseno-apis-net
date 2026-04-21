@@ -1,3 +1,4 @@
+using LibreriaAPI.Events;
 using LibreriaAPI.Models;
 using LibreriaAPI.Repositories;
 using MediatR;
@@ -7,10 +8,12 @@ namespace LibreriaAPI.Features.Libros.Commands;
 public class ActualizarLibroCommandHandler : IRequestHandler<ActualizarLibroCommand, ActualizarLibroResult>
 {
     private readonly ILibrosRepository _repository;
+    private readonly IPublisher _publisher;
 
-    public ActualizarLibroCommandHandler(ILibrosRepository repository)
+    public ActualizarLibroCommandHandler(ILibrosRepository repository, IPublisher publisher)
     {
         _repository = repository;
+        _publisher = publisher;
     }
 
     public async Task<ActualizarLibroResult> Handle(ActualizarLibroCommand request, CancellationToken cancellationToken)
@@ -38,6 +41,11 @@ public class ActualizarLibroCommandHandler : IRequestHandler<ActualizarLibroComm
             _repository.AddLibroAutorAsync(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id })));
 
         await _repository.SaveChangesAsync();
+
+        var libroDto = await _repository.GetByIdAsync(request.Id);
+        if (libroDto is not null)
+            await _publisher.Publish(new LibroActualizadoEvent(libroDto), cancellationToken);
+
         return new ActualizarLibroResult(true, null);
     }
 }

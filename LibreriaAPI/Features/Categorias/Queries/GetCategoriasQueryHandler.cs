@@ -6,9 +6,9 @@ namespace LibreriaAPI.Features.Categorias.Queries;
 
 public class GetCategoriasQueryHandler : IRequestHandler<GetCategoriasQuery, IEnumerable<CategoriaDto>>
 {
-    private readonly ICategoriasRepository _repository;
+    private readonly ICategoriasReadRepository _repository;
 
-    public GetCategoriasQueryHandler(ICategoriasRepository repository)
+    public GetCategoriasQueryHandler(ICategoriasReadRepository repository)
     {
         _repository = repository;
     }
