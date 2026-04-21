@@ -35,10 +35,8 @@ public class CrearLibroCommandHandler : IRequestHandler<CrearLibroCommand, Crear
         await _repository.AddAsync(libro);
         await _repository.SaveChangesAsync();
 
-        foreach (var autor in autores)
-        {
-            await _repository.AddLibroAutorAsync(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id });
-        }
+        await Task.WhenAll(autores.Select(autor =>
+            _repository.AddLibroAutorAsync(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id })));
         await _repository.SaveChangesAsync();
 
         var libroDto = await _repository.GetByIdAsync(libro.Id);

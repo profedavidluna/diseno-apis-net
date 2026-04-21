@@ -34,10 +34,8 @@ public class ActualizarLibroCommandHandler : IRequestHandler<ActualizarLibroComm
         libro.CategoriaId = request.CategoriaId;
 
         _repository.RemoveLibroAutores(libro.LibroAutores);
-        foreach (var autor in autores)
-        {
-            await _repository.AddLibroAutorAsync(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id });
-        }
+        await Task.WhenAll(autores.Select(autor =>
+            _repository.AddLibroAutorAsync(new LibroAutor { LibroId = libro.Id, AutorId = autor.Id })));
 
         await _repository.SaveChangesAsync();
         return new ActualizarLibroResult(true, null);
