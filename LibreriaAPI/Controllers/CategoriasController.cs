@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Features.Categorias.Commands;
 using LibreriaAPI.Features.Categorias.Queries;
@@ -6,9 +7,15 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LibreriaAPI.Controllers;
 
+/// <summary>
+/// Gestión de categorías — el mismo controlador sirve V1 y V2.
+/// En V2, el endpoint GET /categorias devuelve <see cref="CategoriaV2Dto"/> con el campo NombreCompleto.
+/// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v{version:apiVersion}/categorias")]
 [Produces("application/json")]
+[ApiVersion("1.0")]
+[ApiVersion("2.0")]
 public class CategoriasController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -18,13 +25,24 @@ public class CategoriasController : ControllerBase
         _mediator = mediator;
     }
 
-    /// <summary>Obtiene todas las categorías</summary>
+    /// <summary>[V1] Obtiene todas las categorías</summary>
     [HttpGet]
+    [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(IEnumerable<CategoriaDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias()
     {
         var categorias = await _mediator.Send(new GetCategoriasQuery());
         return Ok(categorias);
+    }
+
+    /// <summary>[V2] Obtiene todas las categorías con NombreCompleto (Nombre - Descripcion)</summary>
+    [HttpGet]
+    [MapToApiVersion("2.0")]
+    [ProducesResponseType(typeof(IEnumerable<CategoriaV2Dto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<CategoriaV2Dto>>> GetCategoriasV2()
+    {
+        var categorias = await _mediator.Send(new GetCategoriasQuery());
+        return Ok(categorias.Select(ToV2Dto));
     }
 
     /// <summary>Obtiene una categoría por su ID</summary>
@@ -78,4 +96,8 @@ public class CategoriasController : ControllerBase
 
         return NoContent();
     }
+
+    private static CategoriaV2Dto ToV2Dto(CategoriaDto c) =>
+        new(c.Id, c.Nombre, c.Descripcion,
+            string.IsNullOrWhiteSpace(c.Descripcion) ? c.Nombre : $"{c.Nombre} - {c.Descripcion}");
 }

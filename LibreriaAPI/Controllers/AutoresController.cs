@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Features.Autores.Commands;
 using LibreriaAPI.Features.Autores.Queries;
@@ -6,12 +7,17 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LibreriaAPI.Controllers;
 
+/// <summary>
+/// Gestión de autores — Versión 1.
+/// AutoresV2Controller hereda de este controlador para reutilizar todos los endpoints.
+/// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v{version:apiVersion}/autores")]
 [Produces("application/json")]
+[ApiVersion("1.0")]
 public class AutoresController : ControllerBase
 {
-    private readonly IMediator _mediator;
+    protected readonly IMediator _mediator;
 
     public AutoresController(IMediator mediator)
     {

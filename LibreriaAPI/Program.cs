@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models.ReadModels;
@@ -33,6 +34,19 @@ builder.Services.AddScoped<ILibrosReadRepository, LibrosReadRepository>();
 // MediatR
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
+// API Versioning (URL segment: /api/v1/... y /api/v2/...)
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = new UrlSegmentApiVersionReader();
+}).AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -41,7 +55,19 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Librería API",
         Version = "v1",
-        Description = "API REST para gestionar libros, categorías y autores de una librería.",
+        Description = "API REST para gestionar libros, categorías y autores de una librería — Versión 1.",
+        Contact = new OpenApiContact
+        {
+            Name = "Librería",
+            Email = "contacto@libreria.com"
+        }
+    });
+
+    c.SwaggerDoc("v2", new OpenApiInfo
+    {
+        Title = "Librería API",
+        Version = "v2",
+        Description = "API REST para gestionar libros, categorías y autores de una librería — Versión 2.\n\nMejoras respecto a V1:\n- Categorías: GET /categorias devuelve NombreCompleto (Nombre - Descripción).\n- Autores: nuevo endpoint GET /autores/{id}/nombre-completo.",
         Contact = new OpenApiContact
         {
             Name = "Librería",
@@ -113,6 +139,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Librería API v1");
+        c.SwaggerEndpoint("/swagger/v2/swagger.json", "Librería API v2");
         c.RoutePrefix = string.Empty; // Swagger en la raíz
     });
 }

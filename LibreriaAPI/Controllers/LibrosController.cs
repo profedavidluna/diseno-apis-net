@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Features.Libros.Commands;
 using LibreriaAPI.Features.Libros.Queries;
@@ -7,8 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace LibreriaAPI.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v{version:apiVersion}/libros")]
 [Produces("application/json")]
+[ApiVersion("1.0")]
+[ApiVersion("2.0")]
 public class LibrosController : ControllerBase
 {
     private readonly IMediator _mediator;
