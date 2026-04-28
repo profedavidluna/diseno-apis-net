@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using LibreriaAPI.Data;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Models.ReadModels;
@@ -11,6 +12,23 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Controllers
 builder.Services.AddControllers();
+
+// API Versioning – header (X-API-Version) and query param (?api-version)
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new HeaderApiVersionReader("X-API-Version"),
+        new QueryStringApiVersionReader("api-version")
+    );
+})
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
 
 // EF Core - BD de escritura (Write DB)
 builder.Services.AddDbContext<LibreriaContext>(options =>
@@ -49,11 +67,31 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
+    c.SwaggerDoc("v2", new OpenApiInfo
+    {
+        Title = "Librería API",
+        Version = "v2",
+        Description = "API REST para gestionar libros, categorías y autores de una librería (versión 2).",
+        Contact = new OpenApiContact
+        {
+            Name = "Librería",
+            Email = "contacto@libreria.com"
+        }
+    });
+
     // Include XML comments for Swagger
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
         c.IncludeXmlComments(xmlPath);
+
+    // Only show endpoints that belong to each Swagger doc version
+    c.DocInclusionPredicate((docName, apiDesc) =>
+    {
+        if (apiDesc.GroupName is null)
+            return docName == "v1";
+        return apiDesc.GroupName == docName;
+    });
 });
 
 var app = builder.Build();
@@ -113,6 +151,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Librería API v1");
+        c.SwaggerEndpoint("/swagger/v2/swagger.json", "Librería API v2");
         c.RoutePrefix = string.Empty; // Swagger en la raíz
     });
 }

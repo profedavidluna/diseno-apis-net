@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Features.Categorias.Commands;
 using LibreriaAPI.Features.Categorias.Queries;
@@ -7,8 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace LibreriaAPI.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/categorias")]
 [Produces("application/json")]
+[ApiVersion("1.0")]
+[ApiVersion("2.0")]
 public class CategoriasController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -18,13 +21,30 @@ public class CategoriasController : ControllerBase
         _mediator = mediator;
     }
 
-    /// <summary>Obtiene todas las categorías</summary>
+    /// <summary>Obtiene todas las categorías (v1)</summary>
     [HttpGet]
+    [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(IEnumerable<CategoriaDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<CategoriaDto>>> GetCategorias()
     {
         var categorias = await _mediator.Send(new GetCategoriasQuery());
         return Ok(categorias);
+    }
+
+    /// <summary>Obtiene todas las categorías con nombre completo (v2)</summary>
+    [HttpGet]
+    [MapToApiVersion("2.0")]
+    [ProducesResponseType(typeof(IEnumerable<CategoriaV2Dto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<CategoriaV2Dto>>> GetCategoriasV2()
+    {
+        var categorias = await _mediator.Send(new GetCategoriasQuery());
+        var result = categorias.Select(c => new CategoriaV2Dto(
+            c.Id,
+            c.Nombre,
+            c.Descripcion,
+            string.IsNullOrWhiteSpace(c.Descripcion) ? c.Nombre : $"{c.Nombre} – {c.Descripcion}"
+        ));
+        return Ok(result);
     }
 
     /// <summary>Obtiene una categoría por su ID</summary>

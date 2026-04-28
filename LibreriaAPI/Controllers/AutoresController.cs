@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using LibreriaAPI.DTOs;
 using LibreriaAPI.Features.Autores.Commands;
 using LibreriaAPI.Features.Autores.Queries;
@@ -7,11 +8,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace LibreriaAPI.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/autores")]
 [Produces("application/json")]
+[ApiVersion("1.0")]
 public class AutoresController : ControllerBase
 {
-    private readonly IMediator _mediator;
+    protected readonly IMediator _mediator;
 
     public AutoresController(IMediator mediator)
     {
@@ -21,7 +23,7 @@ public class AutoresController : ControllerBase
     /// <summary>Obtiene todos los autores</summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<AutorDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<AutorDto>>> GetAutores()
+    public virtual async Task<IActionResult> GetAutores()
     {
         var autores = await _mediator.Send(new GetAutoresQuery());
         return Ok(autores);
