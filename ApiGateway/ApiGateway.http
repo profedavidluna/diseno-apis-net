@@ -1,0 +1,40 @@
+@ApiGateway_HostAddress = http://localhost:5001
+
+### Obtener todos los libros
+GET {{ApiGateway_HostAddress}}/gateway/libros
+Accept: application/json
+
+###
+
+### Obtener un libro por ID
+GET {{ApiGateway_HostAddress}}/gateway/libros/1
+Accept: application/json
+
+###
+
+### Crear un libro
+POST {{ApiGateway_HostAddress}}/gateway/libros
+Content-Type: application/json
+
+{
+  "titulo": "El Quijote",
+  "descripcion": "Novela de caballería",
+  "isbn": "978-0-06-112008-4",
+  "anioPublicacion": 1605,
+  "categoriaId": 1,
+  "autoresIds": [1]
+}
+
+###
+
+### Obtener todos los autores
+GET {{ApiGateway_HostAddress}}/gateway/autores
+Accept: application/json
+
+###
+
+### Obtener todas las categorías
+GET {{ApiGateway_HostAddress}}/gateway/categorias
+Accept: application/json
+
+###

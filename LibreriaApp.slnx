@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ApiGateway/ApiGateway.csproj" />
+  <Project Path="LibreriaAPI/LibreriaAPI.csproj" />
+</Solution>
