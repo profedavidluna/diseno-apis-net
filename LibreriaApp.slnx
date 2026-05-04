@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="ApiGateway/ApiGateway.csproj" />
   <Project Path="LibreriaAPI/LibreriaAPI.csproj" />
+  <Project Path="LibreriaApp.AppHost/LibreriaApp.AppHost.csproj" />
+  <Project Path="LibreriaApp.ServiceDefaults/LibreriaApp.ServiceDefaults.csproj" />
 </Solution>
