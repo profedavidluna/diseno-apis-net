@@ -1,0 +1,103 @@
+name: CD - Deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente de despliegue'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  REGISTRY: ghcr.io
+  LIBRERIA_IMAGE: ${{ github.repository }}/libreria-api
+  GATEWAY_IMAGE: ${{ github.repository }}/api-gateway
+  AZURE_RESOURCE_GROUP: rg-libreria-app
+  AZURE_LIBRERIA_APP: libreria-api
+  AZURE_GATEWAY_APP: api-gateway
+  AZURE_CONTAINER_ENV: libreria-app-env
+
+jobs:
+  deploy:
+    name: Deploy to Azure Container Apps
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Login en Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build y Push imagen LibreriaAPI
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: LibreriaAPI/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.LIBRERIA_IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ env.LIBRERIA_IMAGE }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build y Push imagen ApiGateway
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ApiGateway/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.GATEWAY_IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ env.GATEWAY_IMAGE }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Desplegar infraestructura con Bicep
+        uses: azure/arm-deploy@v2
+        with:
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: ./infra/main.bicep
+          parameters: >
+            libreriaImage=${{ env.REGISTRY }}/${{ env.LIBRERIA_IMAGE }}:sha-${{ github.sha }}
+            gatewayImage=${{ env.REGISTRY }}/${{ env.GATEWAY_IMAGE }}:sha-${{ github.sha }}
+            containerRegistryServer=${{ env.REGISTRY }}
+            containerRegistryUsername=${{ github.actor }}
+            containerRegistryPassword=${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verificar despliegue — LibreriaAPI
+        run: |
+          APP_URL=$(az containerapp show \
+            --name ${{ env.AZURE_LIBRERIA_APP }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          echo "LibreriaAPI disponible en: https://$APP_URL"
+
+      - name: Verificar despliegue — ApiGateway
+        run: |
+          GW_URL=$(az containerapp show \
+            --name ${{ env.AZURE_GATEWAY_APP }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          echo "ApiGateway disponible en: https://$GW_URL"

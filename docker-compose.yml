@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  libreria-api:
+    build:
+      context: .
+      dockerfile: LibreriaAPI/Dockerfile
+    container_name: libreria-api
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - libreria-net
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ApiGateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+    depends_on:
+      - libreria-api
+    networks:
+      - libreria-net
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: libreria-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=LibreriaStr0ng!Pass
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'LibreriaStr0ng!Pass' -Q 'SELECT 1' -No || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - libreria-net
+
+volumes:
+  sqlserver-data:
+
+networks:
+  libreria-net:
+    driver: bridge

@@ -1,0 +1,113 @@
+name: CI - Build, Test & Docker
+
+on:
+  push:
+    branches:
+      - copilot/containerizacion-docker-cicd-azure-dotnet
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/libreria-api
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restaurar dependencias
+        run: dotnet restore LibreriaAPI/LibreriaAPI.csproj
+
+      - name: Compilar LibreriaAPI
+        run: dotnet build LibreriaAPI/LibreriaAPI.csproj --no-restore -c Release
+
+      - name: Compilar ApiGateway
+        run: dotnet build ApiGateway/ApiGateway.csproj --no-restore -c Release
+
+      - name: Ejecutar pruebas
+        run: |
+          if find . -name "*.Tests.csproj" | grep -q .; then
+            dotnet test --no-build -c Release --verbosity normal
+          else
+            echo "No hay proyectos de prueba configurados aún."
+          fi
+
+  docker-build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login en GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extraer metadata (tags, labels) — LibreriaAPI
+        id: meta-libreria
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build y Push imagen LibreriaAPI
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: LibreriaAPI/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-libreria.outputs.tags }}
+          labels: ${{ steps.meta-libreria.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extraer metadata (tags, labels) — ApiGateway
+        id: meta-gateway
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/api-gateway
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build y Push imagen ApiGateway
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ApiGateway/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-gateway.outputs.tags }}
+          labels: ${{ steps.meta-gateway.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
